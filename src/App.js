@@ -10,6 +10,7 @@ import 'firebase/compat/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 
+// initialization fo the 
 firebase.initializeApp({
   apiKey: "AIzaSyDjdfD2b7Q6nBzbQheHVFzgbCtYbwHcAbU",
   authDomain: "matcha-text.firebaseapp.com",
@@ -46,15 +47,18 @@ function App() {
 
   return (
     <div className="Matcha">
-      <header></header>
-
+      <header className="header">
+        <span className="matcha-header">Matcha</span>
+        {user && <SignOut />}
+      </header>
+  
       <section>
         {user ? (
           <div>
             <div className="message-container">
               <ChatRoom />
             </div>
-
+  
             <form onSubmit={sendMessage}>
               <input
                 type="text"
@@ -70,8 +74,7 @@ function App() {
       </section>
     </div>
   );
-} 
-
+}
 function SignIn() {
   const useSignInWithGoogle = () => {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -87,7 +90,7 @@ function SignIn() {
 function SignOut() {
   return auth.currentUser && (
     
-    <button onClick={() => auth.SignOut()}>Sign Out</button>
+    <button onClick={() => auth.signOut()}>Sign Out</button>
 
   )
 }
@@ -107,7 +110,7 @@ function ChatRoom() {
       messageContainerRef.current.scrollTop = scrollHeight - clientHeight;
     }
   };
-
+  // scrolls to the bottom so that when a new message renders, we can see it. 
   useEffect(() => {
     scrollToBottom();
   }, [msgs]);
@@ -123,6 +126,7 @@ function ChatMessage(props) {
   const {text, uid, photoURL } = props.message;
 
   const messageClass = uid == auth.currentUser.uid ? 'sent': 'received';
+  //text sent + image
   return (
     <div className={`message ${messageClass}`}>
 
