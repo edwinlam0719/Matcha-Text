@@ -149,7 +149,7 @@ p {
   left: 50%;
   transform: translateX(-50%);
   height: 88%;
-  width: 100%;
+  width: 80%; 
   max-height: 810px;
   overflow-y: auto;
   overflow-x: hidden;

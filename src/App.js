@@ -28,17 +28,48 @@ const firestore = firebase.firestore();
 function App() {
   const [user] = useAuthState(auth);
   const [formValue, setFormValue] = useState('');
-
+  
   useEffect(() => {
     if (user) {
       const userRef = firestore.collection('users').doc(user.uid);
-      try{
       userRef.set({ status: 'online' }, { merge: true });
-      } catch (error) {
-        console.log(error)
-      }
     }
   }, [user]);
+
+  useEffect(() => {
+    const getUsers = async () => {
+      try {
+        const usersSnapshot = await firestore.collection('users').get();
+        const onlineUsers = [];
+  
+        usersSnapshot.forEach((doc) => {
+          const userData = doc.data();
+          if (userData.status === 'online') {
+            onlineUsers.push(userData.username);
+          }
+        });
+  
+        // Update the online users in the HTML element
+        const onlineUsersList = document.getElementById('onlineUsersList');
+        onlineUsersList.innerHTML = onlineUsers.map((username) => `<li>${username}</li>`).join('');
+      } catch (error) {
+        console.log('Error retrieving users:', error);
+      }
+    };
+  
+    // Refresh the list every 5 seconds
+    const refreshInterval = setInterval(() => {
+      getUsers();
+    }, 5000);
+  
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(refreshInterval);
+  }, []);
+  
+  
+  
+  
+  
 
   const handleSignOut = async () => {
     if (user) {
@@ -66,28 +97,27 @@ function App() {
   };
 
   return (
-    
     <div className="Matcha">
       <header className="header">
-      <img src="https://media.discordapp.net/attachments/952013756014153733/1109351054002368592/Untitled_Artwork.png?width=70&height=70" style={{ marginLeft: '20px' }} />
+        <img src="https://media.discordapp.net/attachments/952013756014153733/1109351054002368592/Untitled_Artwork.png?width=70&height=70" style={{ marginLeft: '20px' }} />
         <div className="matcha-header" style={{ fontFamily: 'Arial, sans-serif' }}>Matcha</div>
         {!user && (
-        <div>
-          <SignIn />
-          <SignUp />
-        </div>
+          <div>
+            <SignIn />
+            <SignUp />
+          </div>
         )}
 
         {user && <SignOut handleSignOut={handleSignOut} />}
       </header>
-  
+
       <section>
         {user ? (
           <div>
             <div className="message-container">
               <ChatRoom />
             </div>
-  
+
             <form onSubmit={sendMessage}>
               <input
                 type="text"
@@ -103,9 +133,14 @@ function App() {
           </div>
         )}
       </section>
+
+      <div>
+        <ul id="onlineUsersList"></ul>
+      </div>
+
     </div>
   );
-}  
+}
 
 function SignUp() {
   const [email, setEmail] = useState('');
@@ -115,7 +150,21 @@ function SignUp() {
     e.preventDefault();
 
     try {
-      await auth.createUserWithEmailAndPassword(email, password);
+      const result = await auth.createUserWithEmailAndPassword(email, password);
+      const { user } = result;
+    
+      const str = email.split('@');
+      const username = str[0];
+      const userId = user.uid; // Get the user ID from the user object
+    
+      const userRef = firestore.collection('users').doc(userId);
+      console.log("GOT HERE");
+      userRef.set({
+        status: 'online',
+        email: email,
+        username: username
+      }, { merge: true });
+    
     } catch (error) {
       console.log(error.message);
     }
@@ -174,10 +223,32 @@ function SignUp() {
 
 function SignIn() {
   // sign in with Google
-  const useSignInWithGoogle = () => {
+  const useSignInWithGoogle = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider);
+  
+    try {
+      const result = await auth.signInWithPopup(provider);
+      const { user } = result;
+  
+      const email = user.email;
+      const str = email.split('@');
+      const username = str[0];
+  
+      const userId = user.uid; // Assuming the user ID is available from the user object
+  
+      const userRef = firestore.collection('users').doc(userId);
+      console.log("GOT HERE");
+      userRef.set({
+        status: 'online',
+        email: email,
+        username: username
+      }, {merge: true});
+
+    } catch (error) {
+      console.log(error.message);
+    }
   };
+  
 
   //sing in with email
   const [email, setEmail] = useState('');
@@ -187,10 +258,25 @@ function SignIn() {
     e.preventDefault();
     
     try {
-      await auth.signInWithEmailAndPassword(email, password);
+      const result = await auth.signInWithEmailAndPassword(email, password);
+      const { user } = result;
+    
+      const str = email.split('@');
+      const username = str[0];
+      const userId = user.uid; // Get the user ID from the user object
+    
+      const userRef = firestore.collection('users').doc(userId);
+      console.log("GOT HERE");
+      userRef.set({
+        status: 'online',
+        email: email,
+        username: username
+      }, { merge: true });
+    
     } catch (error) {
       console.log(error.message);
     }
+    
 
     setEmail('');
     setPassword('');
@@ -296,8 +382,17 @@ function ChatRoom() {
   );
 }
 
+
+
 function ChatMessage(props) {
-  const {text, uid, photoURL} = props.message;
+  var {text, uid, photoURL} = props.message;
+
+  var imgs = ['https://cdn.discordapp.com/attachments/952013756014153733/1109606843501772810/def-profile.jpg',
+              'https://cdn.discordapp.com/attachments/952013756014153733/1109607215322640414/Untitled_Artwork.png']
+
+  if (photoURL === null) {
+    photoURL = 'https://cdn.discordapp.com/attachments/952013756014153733/1109607215322640414/Untitled_Artwork.png'
+  }
 
   const messageClass = uid === auth.currentUser.uid ? 'sent': 'received';
   //text sent + image
