@@ -28,7 +28,7 @@ color {
 .matcha-header {
   color: #69BF64;
   font-size: 1.5rem;
-  margin-left: 1050px; /* Adjust the value as needed */
+  margin-left: -1645px; /* Adjust the value as needed */
 }
 
 
@@ -57,21 +57,40 @@ main::-webkit-scrollbar-thumb {
 }
 
 form {
-  height: 15vh;
+  background-color: rgb(24, 23, 23);
+  display: flex;
+  align-items: center;
+  font-size: 1.5rem;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: rgb(24, 23, 23);
-  display: flex;
-  font-size: 1.5rem;
-  z-index: 1; /* Ensure the form is on top of other elements */
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+form input[type="text"],
+form input[type="password"] {
+  margin-right: 10px;
+  padding: 5px;
+  font-size: 1rem;
+  background-color: #1c211b;
+  border: none;
+  color: white;
 }
 
 form button {
-  width: 20%;
-  background-color: #176072;
+  color: white;
+  background-color: #2F4858;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  cursor: pointer;
 }
+
+
+
 
 input {
   line-height: 1.5;
@@ -107,8 +126,6 @@ button:disabled {
   max-width: 400px;
   margin: 0 auto;
 }
-
-
 
 ul, li {
   text-align: left;
@@ -174,8 +191,8 @@ p {
   color: black;
 }
 
-img {
-  width: 40px;
+img2 {
+  width: 45px;
   height: 40px;
   border-radius: 50%;
   margin: 2px 5px;

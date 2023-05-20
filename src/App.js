@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-
 import './App.css';
 
 import firebase from 'firebase/compat/app';
@@ -30,6 +29,27 @@ function App() {
   const [user] = useAuthState(auth);
   const [formValue, setFormValue] = useState('');
 
+  useEffect(() => {
+    if (user) {
+      const userRef = firestore.collection('users').doc(user.uid);
+      try{
+      userRef.set({ status: 'online' }, { merge: true });
+      } catch (error) {
+        console.log(error)
+      }
+    }
+  }, [user]);
+
+  const handleSignOut = async () => {
+    if (user) {
+      // Update user status to "offline" in Firestore before signing out
+      console.log("Going to sign out...")
+      const userRef = firestore.collection('users').doc(user.uid);
+      userRef.set({ status: 'offline' }, { merge: true });
+    }
+    auth.signOut();
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
 
@@ -45,15 +65,20 @@ function App() {
     }
   };
 
-  //catpic.png tiger.jpg
   return (
     
     <div className="Matcha">
       <header className="header">
-        <img src="https://media.discordapp.net/attachments/952013756014153733/1109330196923949136/Untitled_Artwork.png?width=708&height=669"/>
-        <div className="matcha-header">Matcha</div>
-        {!user && <SignIn />}
-        {user && <SignOut />}
+      <img src="https://media.discordapp.net/attachments/952013756014153733/1109351054002368592/Untitled_Artwork.png?width=70&height=70" style={{ marginLeft: '20px' }} />
+        <div className="matcha-header" style={{ fontFamily: 'Arial, sans-serif' }}>Matcha</div>
+        {!user && (
+        <div>
+          <SignIn />
+          <SignUp />
+        </div>
+        )}
+
+        {user && <SignOut handleSignOut={handleSignOut} />}
       </header>
   
       <section>
@@ -81,37 +106,129 @@ function App() {
     </div>
   );
 }  
+
+function SignUp() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+
+    try {
+      await auth.createUserWithEmailAndPassword(email, password);
+    } catch (error) {
+      console.log(error.message);
+    }
+
+    setEmail('');
+    setPassword('');
+  };
+
+  return (
+    <div className="other-element" style={{
+      position: 'relative',
+    }}>
+      <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column' }}>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          style={{
+            backgroundColor: '#1c211b',
+            marginBottom: '10px',
+            padding: '5px',
+            fontSize: '1rem',
+          }}
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          style={{
+            backgroundColor: '#1c211b',
+            marginBottom: '10px',
+            padding: '5px',
+            fontSize: '1rem',
+          }}
+        />
+        <button type="submit"style={{
+          color: 'white',
+          backgroundColor: '#2F4858',
+          border: 'none',
+          paddingBottom: '140px',
+          textAlign: 'center',
+          textDecoration: 'none',
+          cursor: 'pointer',
+          fontSize: '1rem',
+          marginTop: '10px'
+        }}
+        >
+          Register
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function SignIn() {
+  // sign in with Google
   const useSignInWithGoogle = () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider);
   };
 
-  return (
-    <button
-      onClick={useSignInWithGoogle}
-      style={{
-        color: 'white',
-        backgroundColor: '#2F4858',
-        border: 'none',
-        padding: '10px 20px',
-        textAlign: 'center',
-        textDecoration: 'none',
-        cursor: 'pointer',
-        fontSize: '1rem'
-      }}
-    >
-      Sign in with your Google Account
-    </button>
-  );
-}
+  //sing in with email
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-// Sign out from the Web App
-function SignOut() {
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+    } catch (error) {
+      console.log(error.message);
+    }
+
+    setEmail('');
+    setPassword('');
+  };
+
   return (
-    auth.currentUser && (
+    <div>
+      <form onSubmit={handleSignIn}>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+        />
+        <button type="submit"style={{
+          color: 'white',
+          backgroundColor: '#2F4858',
+          border: 'none',
+          padding: '10px 20px',
+          textAlign: 'center',
+          textDecoration: 'none',
+          cursor: 'pointer',
+          fontSize: '1rem',
+          marginTop: '10px'
+        }}
+        >
+          Sign in with Email
+        </button>
+      </form>
+
       <button
-        onClick={() => auth.signOut()}
+        onClick={useSignInWithGoogle}
         style={{
           color: 'white',
           backgroundColor: '#2F4858',
@@ -120,7 +237,31 @@ function SignOut() {
           textAlign: 'center',
           textDecoration: 'none',
           cursor: 'pointer',
-          fontSize: '1rem'
+          fontSize: '1rem',
+          marginTop: '10px'
+        }}
+      >
+        Sign in with your Google Account
+      </button>
+    </div>
+  );
+}
+
+// Sign out from the Web App
+function SignOut({ handleSignOut }) {
+  return (
+    auth.currentUser && (
+      <button
+        onClick={handleSignOut}
+        style={{
+          color: 'white',
+          backgroundColor: '#2F4858',
+          border: 'none',
+          padding: '10px 20px',
+          textAlign: 'center',
+          textDecoration: 'none',
+          cursor: 'pointer',
+          fontSize: '1rem',
         }}
       >
         Sign Out
@@ -128,7 +269,6 @@ function SignOut() {
     )
   );
 }
-
 
 // displays the chat room 
 function ChatRoom() {
@@ -159,12 +299,14 @@ function ChatRoom() {
 function ChatMessage(props) {
   const {text, uid, photoURL} = props.message;
 
-  const messageClass = uid == auth.currentUser.uid ? 'sent': 'received';
+  const messageClass = uid === auth.currentUser.uid ? 'sent': 'received';
   //text sent + image
   return (
     <div className={`message ${messageClass}`}>
 
-    <img src={photoURL} />
+    <img src={photoURL} style={{ width: '45px', height: '45px', borderRadius: '50%', margin: '2px 5px' }} />
+
+
     <p>{text}</p>
   </div>
   )
