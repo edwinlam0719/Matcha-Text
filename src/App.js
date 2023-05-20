@@ -45,10 +45,14 @@ function App() {
     }
   };
 
+  //catpic.png tiger.jpg
   return (
+    
     <div className="Matcha">
       <header className="header">
-        <span className="matcha-header">Matcha</span>
+        <img src="https://media.discordapp.net/attachments/952013756014153733/1109330196923949136/Untitled_Artwork.png?width=708&height=669"/>
+        <div className="matcha-header">Matcha</div>
+        {!user && <SignIn />}
         {user && <SignOut />}
       </header>
   
@@ -69,30 +73,60 @@ function App() {
             </form>
           </div>
         ) : (
-          <SignIn />
+          <div>
+            <SignIn />
+          </div>
         )}
       </section>
     </div>
   );
-}
+}  
 function SignIn() {
   const useSignInWithGoogle = () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider);
-  }
-  // has the user sign in with their Google Account 
-  return(
-    <button onClick={useSignInWithGoogle}>Sign in with your Google Account</button>
-  )
+  };
+
+  return (
+    <button
+      onClick={useSignInWithGoogle}
+      style={{
+        color: 'white',
+        backgroundColor: '#2F4858',
+        border: 'none',
+        padding: '10px 20px',
+        textAlign: 'center',
+        textDecoration: 'none',
+        cursor: 'pointer',
+        fontSize: '1rem'
+      }}
+    >
+      Sign in with your Google Account
+    </button>
+  );
 }
 
 // Sign out from the Web App
 function SignOut() {
-  return auth.currentUser && (
-    
-    <button onClick={() => auth.signOut()}>Sign Out</button>
-
-  )
+  return (
+    auth.currentUser && (
+      <button
+        onClick={() => auth.signOut()}
+        style={{
+          color: 'white',
+          backgroundColor: '#2F4858',
+          border: 'none',
+          padding: '10px 20px',
+          textAlign: 'center',
+          textDecoration: 'none',
+          cursor: 'pointer',
+          fontSize: '1rem'
+        }}
+      >
+        Sign Out
+      </button>
+    )
+  );
 }
 
 
@@ -123,7 +157,7 @@ function ChatRoom() {
 }
 
 function ChatMessage(props) {
-  const {text, uid, photoURL } = props.message;
+  const {text, uid, photoURL} = props.message;
 
   const messageClass = uid == auth.currentUser.uid ? 'sent': 'received';
   //text sent + image
