@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 
 import './App.css';
@@ -26,21 +26,51 @@ const firestore = firebase.firestore();
 
 
 function App() {
+  const [user] = useAuthState(auth);
+  const [formValue, setFormValue] = useState('');
 
-  const [user] = useAuthState(auth)
+  const sendMessage = async (e) => {
+    e.preventDefault();
+
+    if (formValue.trim() !== '') {
+      await firestore.collection('messages').add({
+        text: formValue,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        uid: auth.currentUser.uid,
+        photoURL: auth.currentUser.photoURL
+      });
+
+      setFormValue('');
+    }
+  };
 
   return (
     <div className="Matcha">
-      <header>
-
-      </header>
+      <header></header>
 
       <section>
-        {user ? <ChatRoom/> : <SignIn />}  
-      </section>  
+        {user ? (
+          <div>
+            <div className="message-container">
+              <ChatRoom />
+            </div>
+
+            <form onSubmit={sendMessage}>
+              <input
+                type="text"
+                value={formValue}
+                onChange={(e) => setFormValue(e.target.value)}
+              />
+              <button type="submit">Send</button>
+            </form>
+          </div>
+        ) : (
+          <SignIn />
+        )}
+      </section>
     </div>
   );
-}
+} 
 
 function SignIn() {
   const useSignInWithGoogle = () => {
@@ -66,41 +96,26 @@ function SignOut() {
 // displays the chat room 
 function ChatRoom() {
   const messagesRef = firestore.collection('messages');
-  const query = messagesRef.orderBy('createdAt').limit(50);
+  const query = messagesRef.orderBy('createdAt').limit(1000);
 
   const [msgs] = useCollectionData(query, { idField: 'id' });
-  const [formValue, setFormValue] = useState('');
+  const messageContainerRef = useRef(null);
 
-  const sendMessage = async (e) => {
-    e.preventDefault();
-
-    if (formValue.trim() !== '') {
-      await messagesRef.add({
-        text: formValue,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        uid: auth.currentUser.uid,
-        photoURL: auth.currentUser.photoURL
-      });
-
-      setFormValue('');
+  const scrollToBottom = () => {
+    if (messageContainerRef.current) {
+      const { scrollHeight, clientHeight } = messageContainerRef.current;
+      messageContainerRef.current.scrollTop = scrollHeight - clientHeight;
     }
   };
 
-  return (
-    <>
-      <div>
-        {msgs && msgs.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
-      </div>
+  useEffect(() => {
+    scrollToBottom();
+  }, [msgs]);
 
-      <form onSubmit={sendMessage}>
-        <input
-          type="text"
-          value={formValue}
-          onChange={(e) => setFormValue(e.target.value)}
-        />
-        <button type="submit">Send</button>
-      </form>
-    </>
+  return (
+    <div ref={messageContainerRef} className="message-container">
+      {msgs && msgs.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
+    </div>
   );
 }
 

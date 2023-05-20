@@ -19,8 +19,8 @@ main::-webkit-scrollbar-thumb {
 }
 
 form {
-  height: 10vh;
-  position: fixed;
+  height: 15vh; /* Increase the height to provide more space */
+  position: relative; /* Change to 'absolute' or 'relative' */
   bottom: 0;
   background-color: rgb(24, 23, 23);
   width: 100%;
@@ -28,6 +28,7 @@ form {
   display: flex;
   font-size: 1.5rem;
 }
+
 
 form button {
   width: 20%;
@@ -71,34 +72,49 @@ button:disabled {
 
 
 
-.sent p {
-  color: #fff;
-  background: #67987b;
-  display: inline-block;
-  padding: 10px;
-  border-radius: 20px;
-  margin: 5px;
-  
-}
-
-body {
-  text-align: right;
-}
-
-
-.received p {
-  align-self: flex-start;
-  background: #395544;
-  color: #ffffff;
-  max-width: 70%;
-  width: fit-content;
-  padding: 10px;
-  border-radius: 20px;
-  margin: 5px;
-  word-wrap: break-word;
+ul, li {
   text-align: left;
+  list-style: none;
 }
 
+p {
+  max-width: 500px;
+  margin-bottom: 12px;
+  line-height: 24px;
+  padding: 10px 20px;
+  border-radius: 25px;
+  position: relative;
+  color: white;
+  text-align: center;
+}
+
+.message-container {
+  height: 815px; /* Set the desired height for the message container */
+  overflow-y: auto; /* Enable scrolling when messages exceed container height */
+  overflow-x: hidden; /* Disable horizontal scrolling */
+
+}
+
+
+.message {
+  display: flex;
+  align-items: center;
+}
+
+
+.sent {
+  flex-direction: row-reverse;
+}
+
+.sent p {
+  color: white;
+  background: #78b89d;
+  align-self: flex-end;
+}
+.received p {
+  background: #2c5242;
+  color: black;
+}
 
 img {
   width: 40px;
