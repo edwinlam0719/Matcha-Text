@@ -2,33 +2,259 @@ import React, { useState, useRef, useEffect } from 'react';
 
 import './App.css';
 
+// var AES = require("crypto-js")
+
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
 import 'firebase/compat/auth';
 
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
+import { confirmPasswordReset } from 'firebase/auth';
+
+const { pki, util, symmetric } = require('node-forge');
+const forge = require('node-forge');
 
 // initialization fo the 
 firebase.initializeApp({
-  apiKey: "AIzaSyDjdfD2b7Q6nBzbQheHVFzgbCtYbwHcAbU",
-  authDomain: "matcha-text.firebaseapp.com",
-  projectId: "matcha-text",
-  storageBucket: "matcha-text.appspot.com",
-  messagingSenderId: "630194542456",
-  appId: "1:630194542456:web:3be475814533ce04299a8d",
-  measurementId: "G-YQQJDP5WEQ"
+  apiKey: "AIzaSyDT_C1IIyv5ud4C44P8lKdLIsoWpjVsleY",
+  authDomain: "something-5a43f.firebaseapp.com",
+  projectId: "something-5a43f",
+  storageBucket: "something-5a43f.appspot.com",
+  messagingSenderId: "831854510764",
+  appId: "1:831854510764:web:b902890727e6eaac4b5509",
+  measurementId: "G-8RHCV6BNLY"
 })
 
 const auth = firebase.auth();
 const firestore = firebase.firestore();
 
 
-
 function App() {
   const [user] = useAuthState(auth);
   const [formValue, setFormValue] = useState('');
   
+
+  // Function to generate a random symmetric key
+  function generateSymmetricKey() {
+    return crypto.randomBytes(32); // 32 bytes = 256 bits
+  }
+  const storeSymmetricKey = async (key) => {
+    try {
+      // Create a new document in a "keys" collection with the generated key
+      await firestore.collection('keys').doc('symmetricKey').set({
+        key: key,
+      });
+  
+      console.log('Symmetric key stored in Firestore successfully');
+    } catch (error) {
+      console.error('Error storing symmetric key:', error);
+    }
+  };
+
+  const createChatRoom = async () => {
+    // Delete the existing messages collection
+    invitedUsers = [];
+    const userId = user.uid;
+    const messagesRef = firestore.collection('messages');
+    const keysRef = firestore.collection('keys');
+    await clearCollection(messagesRef);
+    await clearCollection(keysRef);
+
+    const username = firestore.collection('users').doc(userId).get('username');
+
+    var idSymmetric = username + 'symmetricKey';
+
+    // the user who created the chatroom (host) will not have the new symmetric key in local storage
+    var symmKey = ""
+    localStorage.setItem(idSymmetric, symmKey);
+
+    // create new key 
+
+    try{      
+      const userId = user.uid; // Assuming the user ID is available from the user object
+      
+      const userRef = firestore.collection('users').doc(userId);
+      console.log("GOT HERE");
+      userRef.set({
+        //store encrypted symm key?
+        host: "Hosting"
+    }, {merge: true});
+    } catch (error) {
+    console.log(error.message);
+    }
+
+    // console.log(user);
+
+  };
+  const clearCollection = async (collectionRef) => {
+    const snapshot = await collectionRef.get();
+  
+    // Iterate through each document in the collection and delete it
+    snapshot.forEach((doc) => {
+      doc.ref.delete();
+    });
+  };
+
+  //invite
+  const [username, setUsername] = useState('');
+  var [invitedUsers, setInvitedUsers] = useState([]);
+
+  const handleInputChange = (event) => {
+    setUsername(event.target.value);
+  };
+  
+  const handleSubmit = () => {
+    if (username.trim() !== '') {
+      setInvitedUsers((prevUsers) => [...prevUsers, username]);
+      setUsername('');
+    }
+  };
+  
+  const clearInvitedUsers = () => {
+    setInvitedUsers([]);
+  };
+  
+  const checkInvitedUsers = async (invitedUsers) => {
+    const userCollection = firebase.firestore().collection('users');
+    const userSnapshots = await userCollection.where('username', 'in', invitedUsers).get();
+    // gets the symmetric key locally from the host 
+    const userId = user.uid;
+    const username = firestore.collection('users').doc(userId).get('username');
+
+    var idSymmetric = username + 'symmetricKey';
+    const symmetricKey = localStorage.getItem(idSymmetric);
+    console.log("Host: ", username, "will encrypt it with the other person's public key");
+    console.log(idSymmetric);
+  
+    const existingUsers = [];
+    const nonExistingUsers = [];
+  
+    console.log("go therefdassfadafsdafdsfads")
+    userSnapshots.forEach(async (doc) => {
+      existingUsers.push(doc.data().username);
+      console.log('fasjdksda');
+      var invitee = doc.id;
+      // Check if user has a public key  && they have to be online
+      // try {
+        if (doc.data().publicKey && firestore.collection('keys').doc(doc.id).encSymmetricKey != null) {
+          console.log("there is already an encrypted symmetric key for this user...")
+
+        }
+        else {
+          console.log("This person has already had the key encrypted...");
+          const publicKey = doc.data().publicKey;
+          // Store the public key in a temporary variable or perform any desired action
+          console.log(`User ${doc.data().username} has a public key: ${publicKey}`);
+
+
+        
+
+          // encrypt symm key using the public key
+          
+          const buffer = Buffer.from(symmetricKey, 'utf8');
+          const encrypted = crypto.publicEncrypt(publicKey, buffer);
+          const encryptedSymmetricKey = encrypted.toString('base64');
+          console.log(encryptedSymmetricKey);
+          // const encryptedSymmetricKeynew = forge.util.decode64(encryptedSymmetricKey);
+
+          clearInvitedUsers();
+        }
+      
+    });
+  
+    invitedUsers.forEach((user) => {
+      if (!existingUsers.includes(user)) {
+        nonExistingUsers.push(user);
+      }
+    });
+  
+    console.log('Existing Users:', existingUsers);
+    console.log('Non-existing Users:', nonExistingUsers);
+  };
+  
+  checkInvitedUsers(invitedUsers)
+  .then(() => {
+    console.log('Invited users checked successfully');
+  })
+  .catch((error) => {
+    console.error('Error checking invited users:', error);
+  });
+  
+  const decryptSymmetricKey = (encryptedKey, privateKey) => {
+
+    console.log("~~~~~~~~~~~~~~~~~~");
+
+  const decryptionAlgorithm = {
+    name: 'RSA-OAEP'
+  };
+
+  // Decrypt the encrypted symmetric key using the private key
+  window.crypto.subtle.decrypt(decryptionAlgorithm, privateKey, encryptedKey)
+  .then((decryptedKey) => {
+    // Symmetric key decryption successful
+    console.log('Decrypted symmetric key:', decryptedKey);
+    return decryptedKey;
+  })
+  .catch((error) => {
+    // Symmetric key decryption failed
+    console.error('Error decrypting symmetric key:', error);
+  });
+
+};
+
+  const waitForDocument = async (userId) => {
+    const userRef = firestore.collection('keys').doc(userId);
+
+    try {
+      const doc = await userRef.get();
+  
+      if (doc.exists) {
+        return doc.data();
+      } else {
+        throw new Error('Document does not exist');
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log(user.uid);
+        const userId = user.uid;
+        console.log("HELLO I AM HERE NOW KFDSALJFLKSDA ===========");
+        const documentData = await waitForDocument(userId);
+        console.log("PROMISE HAS BEEN RESOLVED NUMBER 2");
+  
+        const username = await firestore.collection('users').doc(userId).get().then((doc) => doc.data().username);
+
+        console.log(username);
+  
+        const idSymmetric = username + 'symmetricKey';
+        const encSymmetricKey = documentData.encSymmetricKey;
+        const id = username + 'privateKey';
+        const privateKey = localStorage.getItem(id);
+  
+        console.log(privateKey);
+        console.log("Going to decrypt");
+        console.log(encSymmetricKey);
+        //private key is correct, 
+        const decryptedSymmetricKey = decryptSymmetricKey(encSymmetricKey, privateKey);
+  
+        console.log("The session key: ", decryptedSymmetricKey);
+  
+        localStorage.setItem(idSymmetric, decryptedSymmetricKey);
+      } catch (error) {
+        console.log("Error occurred during the decryption process:", error);
+      }
+    };
+  
+    fetchData();
+  }, []);
+  
+
   useEffect(() => {
     if (user) {
       const userRef = firestore.collection('users').doc(user.uid);
@@ -65,11 +291,6 @@ function App() {
     // Clean up the interval when the component unmounts
     return () => clearInterval(refreshInterval);
   }, []);
-  
-  
-  
-  
-  
 
   const handleSignOut = async () => {
     if (user) {
@@ -114,8 +335,27 @@ function App() {
       <section>
         {user ? (
           <div>
+            <div className="button-container">
+              <button onClick={createChatRoom}>Create Chat Room</button>
+            </div>
             <div className="message-container">
               <ChatRoom />
+              <div>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={handleInputChange}
+                  placeholder="Enter username"
+                />
+                <button onClick={handleSubmit}>Invite</button>
+                <h2>Invited Users</h2>
+                <ul>
+                  {invitedUsers.map((user, index) => (
+                    <li key={index}>{user}</li>
+                  ))}
+                </ul>
+                <button onClick={clearInvitedUsers}>Clear Invited Users</button>
+              </div>
             </div>
 
             <form onSubmit={sendMessage}>
@@ -134,13 +374,34 @@ function App() {
         )}
       </section>
 
-      <div>
+      <div className="online-users-list">
+        <p className="list-title">Online Users</p>
         <ul id="onlineUsersList"></ul>
       </div>
-
     </div>
   );
-}
+};
+
+
+  // const keys = pki.rsa.generateKeyPair({ bits: 2048 });
+  // const privateKeyPem = pki.privateKeyToPem(keys.privateKey);
+  // const publicKeyPem = pki.publicKeyToPem(keys.publicKey);
+
+  // Generate key pair
+  function generateKeyPair() {
+    return new Promise((resolve, reject) => {
+      try {
+        const keyPair = sjcl.ecc.elGamal.generateKeys(256); // Generate 256-bit key pair
+        const publicKey = sjcl.codec.base64.fromBits(keyPair.pub.get().x, true);
+        const privateKey = sjcl.codec.base64.fromBits(keyPair.sec.get(), true);
+        resolve({ publicKey, privateKey });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+  
+  
 
 function SignUp() {
   const [email, setEmail] = useState('');
@@ -157,21 +418,40 @@ function SignUp() {
       const username = str[0];
       const userId = user.uid; // Get the user ID from the user object
     
-      const userRef = firestore.collection('users').doc(userId);
-      console.log("GOT HERE");
-      userRef.set({
-        status: 'online',
-        email: email,
-        username: username
-      }, { merge: true });
+      // Usage example:
+      generateKeyPair()
+        .then(keyPair => {
+          console.log('Public Key:');
+          console.log(keyPair.publicKey);
     
+          console.log('\nPrivate Key:');
+          console.log(keyPair.privateKey);
+    
+          const userRef = firestore.collection('users').doc(userId);
+          console.log("GOT HERE in creating public key for new user...");
+          userRef.set({
+            status: 'online',
+            email: email,
+            username: username,
+            publicKey: keyPair.publicKey,
+            hosting: ""
+          }, { merge: true });
+    
+          var id = username + 'privateKey';
+          console.log("saving private key into ID:", id);
+          console.log("Private Key: ", keyPair.privateKey);
+          localStorage.setItem(id, keyPair.privateKey);
+        })
+        .catch(error => {
+          console.error('Error generating key pair:', error);
+        });
+    
+      setEmail('');
+      setPassword('');
     } catch (error) {
-      console.log(error.message);
+      console.error('Error creating user:', error);
     }
-
-    setEmail('');
-    setPassword('');
-  };
+  }
 
   return (
     <div className="other-element" style={{
@@ -235,13 +515,41 @@ function SignIn() {
       const username = str[0];
   
       const userId = user.uid; // Assuming the user ID is available from the user object
-  
+
       const userRef = firestore.collection('users').doc(userId);
+
+      try{
+        if(userRef.get('publicKey') != null || userRef.get('publicKey') == undefined) {
+          console.log("There is a public key");
+        }
+
+      } catch(error) {
+        // console.log("NO PUBLIC KEY");
+        const keyPair = generateKeyPair();
+        console.log('Private Key:', keyPair.privateKey);
+        console.log('Public Key:', keyPair.publicKey);
+  
+        console.log("public key: ", keyPair.publicKey);
+
+        userRef.set({
+          publicKey:keyPair.publicKey,
+          host: ""
+        }, {merge: true});
+
+        var id = username + 'privateKey';
+        console.log("saving private key into ID: ", id);
+        console.log("Private key: ", keyPair.privateKey);
+        localStorage.setItem(id, keyPair.privateKey);
+      }
+
+
+  
       console.log("GOT HERE");
       userRef.set({
         status: 'online',
         email: email,
-        username: username
+        username: username,
+        host: ""
       }, {merge: true});
 
     } catch (error) {
@@ -270,7 +578,8 @@ function SignIn() {
       userRef.set({
         status: 'online',
         email: email,
-        username: username
+        username: username,
+        host: ""
       }, { merge: true });
     
     } catch (error) {
@@ -356,11 +665,11 @@ function SignOut({ handleSignOut }) {
   );
 }
 
-// displays the chat room 
+
 function ChatRoom() {
   const messagesRef = firestore.collection('messages');
   const query = messagesRef.orderBy('createdAt').limit(1000);
-
+  
   const [msgs] = useCollectionData(query, { idField: 'id' });
   const messageContainerRef = useRef(null);
 
