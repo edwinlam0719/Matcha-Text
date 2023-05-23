@@ -248,10 +248,12 @@ function App() {
     }
   }
   
+  const [decryptedSymmetricKey, setDecryptedSymmetricKey] = useState('');
+
   const waitForDocument = async (userId) => {
     return new Promise((resolve, reject) => {
       const userRef = firestore.collection('keys').doc(userId);
-  
+
       const unsubscribe = userRef.onSnapshot(
         (doc) => {
           if (doc.exists) {
@@ -267,44 +269,35 @@ function App() {
       );
     });
   };
-  
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // user.id 
-        console.log("Current user: ",user.uid);
         const userId = user.uid;
         const documentData = await waitForDocument(userId);
-        console.log("PROMISE HAS BEEN RESOLVED NUMBER 2");
-  
+
         const username = await firestore.collection('users').doc(userId).get().then((doc) => doc.data().username);
 
-        console.log("OUTPUTTING THE USERNAME FOR SOME REASON", username);
-  
-        //const idSymmetric = username + 'symmetricKey';
         const encSymmetricKey = documentData.encSymmetricKey;
-        //const id = username + 'privateKey';
-        //const privateKey = localStorage.getItem(id);
-  
-        //console.log(privateKey);
-        //console.log("Going to decrypt");
-        //console.log(encSymmetricKey);
-        //private key is correct, 
+
         const decryptedSymmetricKey = retrieveAndDecryptSymmetricKey(userId);
 
-        //store the decryptedSymmetricKey in local storage for the recipient
-
-  
         console.log("The session key: ", decryptedSymmetricKey);
-  
+
         localStorage.setItem("decryptedSymmetricKey", decryptedSymmetricKey);
-        
+
+        setDecryptedSymmetricKey(decryptedSymmetricKey);
       } catch (error) {
         console.log("Error occurred during the decryption process:", error);
       }
     };
-  
+
     fetchData();
+    const intervalId = setInterval(fetchData, 5000); // Call fetchData every 5 seconds
+
+    return () => {
+      clearInterval(intervalId); // Clean up the interval on component unmount
+    };
   }, []);
   
 
@@ -345,6 +338,7 @@ function App() {
     return () => clearInterval(refreshInterval);
   }, []);
 
+  
   const handleSignOut = async () => {
     if (user) {
       // Update user status to "offline" in Firestore before signing out
@@ -416,7 +410,7 @@ function App() {
         {user ? (
           <div>
             <div className="button-container">
-              <button onClick={createChatRoom}>Create Chat Room</button>
+              <button onClick={createChatRoom}>Create</button>
             </div>
             <div className="message-container">
               <ChatRoom />
@@ -428,13 +422,13 @@ function App() {
                   placeholder="Enter username"
                 />
                 <button onClick={handleSubmit}>Invite</button>
-                <h2>Invited Users</h2>
+                <h2>  [Invited Users]</h2>
                 <ul>
                   {invitedUsers.map((user, index) => (
                     <li key={index}>{user}</li>
                   ))}
                 </ul>
-                <button onClick={clearInvitedUsers}>Clear Invited Users</button>
+                
               </div>
             </div>
 
@@ -700,22 +694,7 @@ function SignIn() {
         </button>
       </form>
 
-      <button
-        onClick={useSignInWithGoogle}
-        style={{
-          color: 'white',
-          backgroundColor: '#2F4858',
-          border: 'none',
-          padding: '10px 20px',
-          textAlign: 'center',
-          textDecoration: 'none',
-          cursor: 'pointer',
-          fontSize: '1rem',
-          marginTop: '10px'
-        }}
-      >
-        Sign in with your Google Account
-      </button>
+      
     </div>
   );
 }
@@ -783,7 +762,13 @@ function ChatMessage(props) {
         photoURL: auth.currentUser.photoURL,
         iv: iv
       }
-   * 
+   * localStorage.setItem('byedecryptedSymmetricKey, key)
+     id = uisername + 'decryptedSymmetricKey'
+     try{
+      symmKey = localStorage.getItem(id)
+     } catch (e) {
+      console.log("You are not one who has a KEY")
+     }
    */
 
 // need if statement for the host's symmetric key: symmKey
@@ -792,12 +777,13 @@ function ChatMessage(props) {
 
   var symmetricKey= "";
   
-  if(status == 'hosting') {
+  if(status === 'hosting') {
     console.log("I AM THE HOST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     symmetricKey = localStorage.getItem('symmKey');
     console.log(symmetricKey);
   } else {
     console.log("I aint hostee");
+    
     symmetricKey = localStorage.getItem('decryptedSymmetricKey');
 
   }

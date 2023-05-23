@@ -280,7 +280,7 @@ img2 {
 }
 
 .button-container button {
-  margin-left: 25px; /* Add margin to create space between button and container */
+  margin-left: 0px; /* Add margin to create space between button and container */
   margin-bottom: 750px; /* Add margin to create space between button and container */
   border-radius: 20px;
 }
