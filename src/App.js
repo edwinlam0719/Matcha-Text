@@ -11,6 +11,7 @@ import 'firebase/compat/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 import { confirmPasswordReset } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 
 const { pki, util, symmetric } = require('node-forge');
 const forge = require('node-forge');
@@ -37,20 +38,14 @@ function App() {
 
   // Function to generate a random symmetric key
   function generateSymmetricKey() {
-    return crypto.randomBytes(32); // 32 bytes = 256 bits
+    // Simulate a symmetric key
+    const symmetricKey = forge.random.getBytesSync(32); // 256-bit key
+    console.log('Original Key:', forge.util.bytesToHex(symmetricKey));
+
+    // new added line that would return the created symmetric key
+    return symmetricKey;
+ 
   }
-  const storeSymmetricKey = async (key) => {
-    try {
-      // Create a new document in a "keys" collection with the generated key
-      await firestore.collection('keys').doc('symmetricKey').set({
-        key: key,
-      });
-  
-      console.log('Symmetric key stored in Firestore successfully');
-    } catch (error) {
-      console.error('Error storing symmetric key:', error);
-    }
-  };
 
   const createChatRoom = async () => {
     // Delete the existing messages collection
@@ -63,13 +58,18 @@ function App() {
 
     const username = firestore.collection('users').doc(userId).get('username');
 
-    var idSymmetric = username + 'symmetricKey';
+    //var idSymmetric = username + 'symmetricKey';
 
     // the user who created the chatroom (host) will not have the new symmetric key in local storage
-    var symmKey = ""
-    localStorage.setItem(idSymmetric, symmKey);
-
+    //var symmKey = ""
+    //localStorage.setItem(idSymmetric, symmKey);
+    
     // create new key 
+    const symmetricKey = generateSymmetricKey();
+    console.log('Original Created after generating new chat room key:', forge.util.bytesToHex(symmetricKey));
+    console.log("Storing into 'symmKey");
+    localStorage.setItem('symmKey', symmetricKey);
+
 
     try{      
       const userId = user.uid; // Assuming the user ID is available from the user object
@@ -84,7 +84,6 @@ function App() {
     console.log(error.message);
     }
 
-    // console.log(user);
 
   };
   const clearCollection = async (collectionRef) => {
@@ -122,10 +121,10 @@ function App() {
     const userId = user.uid;
     const username = firestore.collection('users').doc(userId).get('username');
 
-    var idSymmetric = username + 'symmetricKey';
-    const symmetricKey = localStorage.getItem(idSymmetric);
-    console.log("Host: ", username, "will encrypt it with the other person's public key");
-    console.log(idSymmetric);
+    //var idSymmetric = username + 'symmetricKey';
+    //const symmetricKey = localStorage.getItem(idSymmetric);
+    //console.log("Host: ", username, "will encrypt it with the other person's public key");
+    //console.log(idSymmetric);
   
     const existingUsers = [];
     const nonExistingUsers = [];
@@ -142,22 +141,32 @@ function App() {
 
         }
         else {
-          console.log("This person has already had the key encrypted...");
+
+          const symmetricKey = localStorage.getItem('symmKey');
+          console.log('Original Created after generating new chat room key:', forge.util.bytesToHex(symmetricKey));
+          console.log("Storing into 'symmKey");
+          
+          //console.log("This person has already had the key encrypted...");
           const publicKey = doc.data().publicKey;
           // Store the public key in a temporary variable or perform any desired action
           console.log(`User ${doc.data().username} has a public key: ${publicKey}`);
 
+           // Encrypt the symmetric key using the recipient's public key
+          const recipientPublicKey = forge.pki.publicKeyFromPem(publicKey);
+          const encryptedSymmetricKey = recipientPublicKey.encrypt(symmetricKey, 'RSA-OAEP', {
+            md: forge.md.sha256.create(),
+          });
+          console.log('Encrypted Symmetric Key:', forge.util.encode64(encryptedSymmetricKey));
 
-        
-
-          // encrypt symm key using the public key
-          
-          const buffer = Buffer.from(symmetricKey, 'utf8');
-          const encrypted = crypto.publicEncrypt(publicKey, buffer);
-          const encryptedSymmetricKey = encrypted.toString('base64');
-          console.log(encryptedSymmetricKey);
-          // const encryptedSymmetricKeynew = forge.util.decode64(encryptedSymmetricKey);
-
+          // Store the encrypted symmetric key and public key in Cloud Firestore
+          const encryptedSymmetricKeyBase64 = forge.util.encode64(encryptedSymmetricKey);
+          const publicKeyPem = forge.pki.publicKeyToPem(recipientPublicKey);
+          //need to link the USERID Document to the invited user so they can retrieve and decrypt
+          firestore.collection('keys').doc(doc.id).set({
+            key: encryptedSymmetricKeyBase64,
+            publicKey: publicKeyPem,
+          });
+         
           clearInvitedUsers();
         }
       
@@ -180,72 +189,116 @@ function App() {
   .catch((error) => {
     console.error('Error checking invited users:', error);
   });
+
+
+  /**
+   * 
+   *           //console.log("This person has already had the key encrypted...");
+          const publicKey = doc.data().publicKey;
+          // Store the public key in a temporary variable or perform any desired action
+          console.log(`User ${doc.data().username} has a public key: ${publicKey}`);
+
+           // Encrypt the symmetric key using the recipient's public key
+          const recipientPublicKey = forge.pki.publicKeyFromPem(publicKey);
+          const encryptedSymmetricKey = recipientPublicKey.encrypt(symmetricKey, 'RSA-OAEP', {
+            md: forge.md.sha256.create(),
+          });} userId 
+   * 
+   */
+
+  //var id = username + 'privateKey';
+  async function retrieveAndDecryptSymmetricKey(userId) {
+    const id = 'privateKey';
+
+
   
-  const decryptSymmetricKey = (encryptedKey, privateKey) => {
-
-    console.log("~~~~~~~~~~~~~~~~~~");
-
-  const decryptionAlgorithm = {
-    name: 'RSA-OAEP'
-  };
-
-  // Decrypt the encrypted symmetric key using the private key
-  window.crypto.subtle.decrypt(decryptionAlgorithm, privateKey, encryptedKey)
-  .then((decryptedKey) => {
-    // Symmetric key decryption successful
-    console.log('Decrypted symmetric key:', decryptedKey);
-    return decryptedKey;
-  })
-  .catch((error) => {
-    // Symmetric key decryption failed
-    console.error('Error decrypting symmetric key:', error);
-  });
-
-};
-
-  const waitForDocument = async (userId) => {
-    const userRef = firestore.collection('keys').doc(userId);
-
+    const retPrivateKey = await firestore.collection('users').doc(userId).get().then((doc) => doc.data().privateKey);
+  
+    console.log(retPrivateKey);
+  
+    console.log("Retrieving from id:", userId);
+  
+    const encryptedKeyDocRef = firestore.collection('keys').doc(userId);
     try {
-      const doc = await userRef.get();
+      const docSnapshot = await encryptedKeyDocRef.get();
+      if (docSnapshot.exists) {
+        const encryptedKeyData = docSnapshot.data();
+        console.log(encryptedKeyData.key);
+        const retrievedEncryptedSymmetricKey = forge.util.decode64(encryptedKeyData.key);
+        const privateKey = forge.pki.privateKeyFromPem(retPrivateKey);
+        
+        console.log("PrivateKey Retrieved:", retPrivateKey);
+        console.log("enc symm key",  forge.util.encode64(retrievedEncryptedSymmetricKey));
+        console.log("Now decrypting...");
   
-      if (doc.exists) {
-        return doc.data();
+        const decryptedSymmetricKey = privateKey.decrypt(retrievedEncryptedSymmetricKey, 'RSA-OAEP', {
+          md: forge.md.sha256.create(),
+        });
+  
+        console.log('Decrypted Symmetric Key:', forge.util.bytesToHex(decryptedSymmetricKey));
+  
+        return decryptedSymmetricKey;
       } else {
-        throw new Error('Document does not exist');
+        console.log('Encrypted symmetric key document not found.');
+        return null;
       }
     } catch (error) {
-      throw error;
+      console.error('Error retrieving encrypted symmetric key:', error);
+      return null;
     }
+  }
+  
+  const waitForDocument = async (userId) => {
+    return new Promise((resolve, reject) => {
+      const userRef = firestore.collection('keys').doc(userId);
+  
+      const unsubscribe = userRef.onSnapshot(
+        (doc) => {
+          if (doc.exists) {
+            unsubscribe(); // Unsubscribe to stop listening for further changes
+            resolve(doc.data());
+          } else {
+            reject(new Error('Document does not exist'));
+          }
+        },
+        (error) => {
+          reject(error);
+        }
+      );
+    });
   };
   
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log(user.uid);
+        // user.id 
+        console.log("Current user: ",user.uid);
         const userId = user.uid;
-        console.log("HELLO I AM HERE NOW KFDSALJFLKSDA ===========");
         const documentData = await waitForDocument(userId);
         console.log("PROMISE HAS BEEN RESOLVED NUMBER 2");
   
         const username = await firestore.collection('users').doc(userId).get().then((doc) => doc.data().username);
 
-        console.log(username);
+        console.log("OUTPUTTING THE USERNAME FOR SOME REASON", username);
   
-        const idSymmetric = username + 'symmetricKey';
+        //const idSymmetric = username + 'symmetricKey';
         const encSymmetricKey = documentData.encSymmetricKey;
-        const id = username + 'privateKey';
-        const privateKey = localStorage.getItem(id);
+        //const id = username + 'privateKey';
+        //const privateKey = localStorage.getItem(id);
   
-        console.log(privateKey);
-        console.log("Going to decrypt");
-        console.log(encSymmetricKey);
+        //console.log(privateKey);
+        //console.log("Going to decrypt");
+        //console.log(encSymmetricKey);
         //private key is correct, 
-        const decryptedSymmetricKey = decryptSymmetricKey(encSymmetricKey, privateKey);
+        const decryptedSymmetricKey = retrieveAndDecryptSymmetricKey(userId);
+
+        //store the decryptedSymmetricKey in local storage for the recipient
+
   
         console.log("The session key: ", decryptedSymmetricKey);
   
-        localStorage.setItem(idSymmetric, decryptedSymmetricKey);
+        localStorage.setItem("decryptedSymmetricKey", decryptedSymmetricKey);
+        
       } catch (error) {
         console.log("Error occurred during the decryption process:", error);
       }
@@ -306,11 +359,38 @@ function App() {
     e.preventDefault();
 
     if (formValue.trim() !== '') {
+
+      // need if statement for the host's symmetric key: symmKey FOR MESSAGE ENCRYPTION
+      const decryptedSymmetricKey = localStorage.getItem('decryptedSymmetricKey');
+
+      // convert hte syummetric key to a forge cipher object 
+      const cipher = forge.cipher.createCipher('AES-CTR', decryptedSymmetricKey);
+
+      // generate a random IV (initialiation vector)
+      const iv = forge.random.getBytesSync(16);
+
+      // set the IV for the cipher
+      cipher.start({ iv });
+
+      // convert the message to bytes
+      const messageBytes = forge.util.createBuffer(formValue, 'utf8');
+
+      // update the cipher with the message bytes
+      cipher.update(messageBytes);
+      // finish up
+      cipher.finish();
+
+      const encryptedMessage = cipher.output;
+      const encryptedMessageBase64 = forge.util.encode64(encryptedMessage.getBytes());
+      
+
+
       await firestore.collection('messages').add({
-        text: formValue,
+        encryptedMessage: encryptedMessageBase64,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         uid: auth.currentUser.uid,
-        photoURL: auth.currentUser.photoURL
+        photoURL: auth.currentUser.photoURL,
+        iv: forge.util.encode64(iv)
       });
 
       setFormValue('');
@@ -383,25 +463,21 @@ function App() {
 };
 
 
-  // const keys = pki.rsa.generateKeyPair({ bits: 2048 });
-  // const privateKeyPem = pki.privateKeyToPem(keys.privateKey);
-  // const publicKeyPem = pki.publicKeyToPem(keys.publicKey);
+// Generate key pair
+function generateKeyPair() {
+  return new Promise((resolve, reject) => {
+    // Generate RSA key pair
+    const rsaKeyPair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+    const publicKeyPem = forge.pki.publicKeyToPem(rsaKeyPair.publicKey);
+    const privateKeyPem = forge.pki.privateKeyToPem(rsaKeyPair.privateKey);
 
-  // Generate key pair
-  function generateKeyPair() {
-    return new Promise((resolve, reject) => {
-      try {
-        const keyPair = sjcl.ecc.elGamal.generateKeys(256); // Generate 256-bit key pair
-        const publicKey = sjcl.codec.base64.fromBits(keyPair.pub.get().x, true);
-        const privateKey = sjcl.codec.base64.fromBits(keyPair.sec.get(), true);
-        resolve({ publicKey, privateKey });
-      } catch (error) {
-        reject(error);
-      }
+    resolve({
+      publicKey: publicKeyPem,
+      privateKey: privateKeyPem
     });
-  }
-  
-  
+  });
+}
+
 
 function SignUp() {
   const [email, setEmail] = useState('');
@@ -420,27 +496,29 @@ function SignUp() {
     
       // Usage example:
       generateKeyPair()
-        .then(keyPair => {
-          console.log('Public Key:');
-          console.log(keyPair.publicKey);
-    
-          console.log('\nPrivate Key:');
-          console.log(keyPair.privateKey);
-    
-          const userRef = firestore.collection('users').doc(userId);
-          console.log("GOT HERE in creating public key for new user...");
-          userRef.set({
-            status: 'online',
-            email: email,
-            username: username,
-            publicKey: keyPair.publicKey,
-            hosting: ""
-          }, { merge: true });
+      .then(keyPair => {
+        console.log('Public Key:');
+        console.log(keyPair.publicKey);
+
+        console.log('\nPrivate Key:');
+        console.log(keyPair.privateKey);
+
+        const userRef = firestore.collection('users').doc(userId);
+        console.log("GOT HERE in creating public key for new user...");
+        userRef.set({
+          status: 'online',
+          email: email,
+          username: username,
+          publicKey: keyPair.publicKey,
+          privateKey: keyPair.privateKey,
+          host: ""
+        }, { merge: true });
     
           var id = username + 'privateKey';
-          console.log("saving private key into ID:", id);
-          console.log("Private Key: ", keyPair.privateKey);
-          localStorage.setItem(id, keyPair.privateKey);
+          //fernanbryan28privateKey
+          //console.log("saving private key into ID:", id);
+          //console.log("Private Key: ", keyPair.privateKey);
+          localStorage.setItem('privateKey', keyPair.privateKey);
         })
         .catch(error => {
           console.error('Error generating key pair:', error);
@@ -694,7 +772,52 @@ function ChatRoom() {
 
 
 function ChatMessage(props) {
-  var {text, uid, photoURL} = props.message;
+  var {encryptedMessage, uid, photoURL, iv} = props.message;
+
+  /**
+   * var {encText,, uid, photoURL, iv} = props.message
+   * {
+        encryptedMessage: encryptedMessage,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        uid: auth.currentUser.uid,
+        photoURL: auth.currentUser.photoURL,
+        iv: iv
+      }
+   * 
+   */
+
+// need if statement for the host's symmetric key: symmKey
+//        const username = await firestore.collection('users').doc(userId).get().then((doc) => doc.data().username);
+  const status = firestore.collection('users').doc(uid).get('hosting');
+
+  var symmetricKey= "";
+  
+  if(status == 'hosting') {
+    console.log("I AM THE HOST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    symmetricKey = localStorage.getItem('symmKey');
+    console.log(symmetricKey);
+  } else {
+    console.log("I aint hostee");
+    symmetricKey = localStorage.getItem('decryptedSymmetricKey');
+
+  }
+    // var symmetricKey = localStorage.getItem('decryptedSymmetricKey');
+
+  const encryptedMessageBytes = forge.util.decode64(encryptedMessage);
+  
+  const ivBytes = forge.util.decode64(iv);
+
+  var decipher = forge.cipher.createDecipher('AES-CTR', symmetricKey);
+
+  decipher.start({iv: ivBytes });
+  decipher.update(forge.util.createBuffer(encryptedMessageBytes));
+  decipher.finish();
+
+  // get decrypted message...
+  var decryptedMessage = decipher.output.toString('utf8');
+  console.log('decrypted message', decryptedMessage);
+
+  var text = decryptedMessage;
 
   var imgs = ['https://cdn.discordapp.com/attachments/952013756014153733/1109606843501772810/def-profile.jpg',
               'https://cdn.discordapp.com/attachments/952013756014153733/1109607215322640414/Untitled_Artwork.png']
